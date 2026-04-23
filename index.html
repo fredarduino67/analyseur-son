@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Son Visuel">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Analyseur de Son</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; background: #0f172a; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; overflow: hidden; }
+    #app { display: flex; flex-direction: column; height: 100%; padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 16px); gap: 14px; }
+    #header { text-align: center; padding-top: 8px; }
+    #header h1 { font-size: 17px; font-weight: 600; color: #94a3b8; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    /* Grand affichage dB */
+    #db-section { text-align: center; }
+    #db-display { font-size: 80px; font-weight: 700; line-height: 1; transition: color 0.15s; color: #5DCAA5; }
+    #db-display span { font-size: 28px; font-weight: 400; color: #64748b; margin-left: 4px; }
+    #status-badge {
+      display: inline-block; margin-top: 8px;
+      font-size: 15px; font-weight: 600; padding: 5px 20px;
+      border-radius: 99px; transition: background 0.2s, color 0.2s;
+      background: #1e293b; color: #64748b;
+    }
+
+    /* Barre de niveau */
+    #bar-wrap { flex-shrink: 0; }
+    #bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: #475569; margin-bottom: 5px; }
+    #bar-track { width: 100%; height: 28px; background: #1e293b; border-radius: 14px; overflow: hidden; }
+    #bar { height: 100%; width: 0%; border-radius: 14px; transition: width 0.08s, background 0.2s; }
+
+    /* Légende */
+    #legend { display: flex; justify-content: space-around; flex-shrink: 0; }
+    .leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #64748b; }
+    .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Forme d'onde */
+    #wave-wrap { flex: 1; min-height: 0; }
+    #wave-canvas { display: block; width: 100%; height: 100%; border-radius: 16px; background: #1e293b; }
+
+    /* Historique */
+    #hist-wrap { flex-shrink: 0; }
+    #hist-row { display: flex; gap: 4px; align-items: flex-end; height: 44px; }
+    .hbar { flex: 1; border-radius: 3px 3px 0 0; transition: height 0.15s; background: #1e293b; min-width: 0; }
+    #hist-label { font-size: 10px; color: #334155; text-align: center; margin-top: 3px; }
+
+    /* Bouton */
+    #btn-wrap { flex-shrink: 0; }
+    #start-btn {
+      display: block; width: 100%; padding: 16px;
+      background: #1d4ed8; color: #fff;
+      border: none; border-radius: 16px;
+      font-size: 17px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    #start-btn:active { transform: scale(0.97); background: #1e40af; }
+    #start-btn.active { background: #7f1d1d; }
+    #start-btn.active:active { background: #991b1b; }
+
+    #error-msg {
+      display: none; background: #7f1d1d; color: #fca5a5;
+      border-radius: 12px; padding: 12px; font-size: 14px; text-align: center;
+    }
+
+    /* Instruction installation */
+    #install-hint {
+      text-align: center; font-size: 12px; color: #334155;
+      padding: 4px 0;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="header"><h1>Analyseur de Son</h1></div>
+
+  <div id="db-section">
+    <div id="db-display">– <span>dB</span></div>
+    <div id="status-badge">En attente</div>
+  </div>
+
+  <div id="bar-wrap">
+    <div id="bar-labels">
+      <span>Silence</span><span>Faible</span><span>Normal</span><span>Fort</span><span>Très fort</span>
+    </div>
+    <div id="bar-track"><div id="bar"></div></div>
+  </div>
+
+  <div id="legend">
+    <div class="leg"><div class="leg-dot" style="background:#5DCAA5"></div>Silence</div>
+    <div class="leg"><div class="leg-dot" style="background:#378ADD"></div>Faible</div>
+    <div class="leg"><div class="leg-dot" style="background:#EF9F27"></div>Normal</div>
+    <div class="leg"><div class="leg-dot" style="background:#E24B4A"></div>Fort</div>
+  </div>
+
+  <div id="wave-wrap"><canvas id="wave-canvas"></canvas></div>
+
+  <div id="hist-wrap">
+    <div id="hist-row"></div>
+    <div id="hist-label">Historique 20 secondes</div>
+  </div>
+
+  <div id="error-msg"></div>
+  <div id="btn-wrap"><button id="start-btn">Activer le microphone</button></div>
+  <div id="install-hint">Pour installer : Safari → Partager → Sur l'écran d'accueil</div>
+</div>
+
+<script>
+const btn = document.getElementById('start-btn');
+const dbDisplay = document.getElementById('db-display');
+const bar = document.getElementById('bar');
+const badge = document.getElementById('status-badge');
+const canvas = document.getElementById('wave-canvas');
+const ctx = canvas.getContext('2d');
+const histRow = document.getElementById('hist-row');
+const errorMsg = document.getElementById('error-msg');
+
+let audioCtx, analyser, source, rafId, running = false;
+let history = [], countDb = 0, currentDb = 0;
+
+function getColor(db) {
+  if (db < 30) return '#5DCAA5';
+  if (db < 55) return '#378ADD';
+  if (db < 70) return '#EF9F27';
+  return '#E24B4A';
+}
+function getLabel(db) {
+  if (db < 30) return { text: 'Silence', bg: '#052e16', color: '#86efac' };
+  if (db < 40) return { text: 'Très faible', bg: '#0c1a3a', color: '#93c5fd' };
+  if (db < 55) return { text: 'Faible', bg: '#0c1a3a', color: '#93c5fd' };
+  if (db < 65) return { text: 'Normal', bg: '#2d1a00', color: '#fcd34d' };
+  if (db < 75) return { text: 'Fort', bg: '#3b0000', color: '#fca5a5' };
+  return { text: 'Très fort', bg: '#3b0000', color: '#f87171' };
+}
+
+function buildHist() {
+  histRow.innerHTML = '';
+  for (let i = 0; i < 20; i++) {
+    const d = document.createElement('div');
+    d.className = 'hbar';
+    histRow.appendChild(d);
+  }
+}
+function updateHist() {
+  const bars = histRow.querySelectorAll('.hbar');
+  const slice = history.slice(-20);
+  bars.forEach((b, i) => {
+    const v = slice[i];
+    if (v == null) { b.style.height = '2px'; b.style.background = '#1e293b'; return; }
+    b.style.height = Math.min(100, Math.max(2, v)) + '%';
+    b.style.background = getColor(v);
+  });
+}
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = rect.height * window.devicePixelRatio;
+}
+
+function drawWave(data) {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.beginPath();
+  ctx.strokeStyle = getColor(currentDb);
+  ctx.lineWidth = 2.5 * window.devicePixelRatio;
+  const step = Math.ceil(data.length / (W / window.devicePixelRatio));
+  let x = 0;
+  for (let i = 0; i < data.length; i += step) {
+    const v = (data[i] / 128) - 1;
+    const y = H / 2 + v * (H / 2 - 8);
+    i === 0 ? ctx.moveTo(x * window.devicePixelRatio, y) : ctx.lineTo(x * window.devicePixelRatio, y);
+    x++;
+  }
+  ctx.stroke();
+}
+
+function loop() {
+  if (!running) return;
+  rafId = requestAnimationFrame(loop);
+  const len = analyser.frequencyBinCount;
+  const data = new Uint8Array(len);
+  analyser.getByteTimeDomainData(data);
+  let rms = 0;
+  for (let i = 0; i < len; i++) { const s = (data[i] / 128) - 1; rms += s * s; }
+  rms = Math.sqrt(rms / len);
+  const db = rms > 0 ? Math.round(20 * Math.log10(rms) + 90) : 0;
+  currentDb = Math.max(0, Math.min(100, db));
+  const color = getColor(currentDb);
+  const label = getLabel(currentDb);
+  dbDisplay.innerHTML = currentDb + ' <span>dB</span>';
+  dbDisplay.style.color = color;
+  bar.style.width = currentDb + '%';
+  bar.style.background = color;
+  badge.textContent = label.text;
+  badge.style.background = label.bg;
+  badge.style.color = label.color;
+  drawWave(data);
+  if (countDb % 10 === 0) {
+    history.push(currentDb);
+    if (history.length > 20) history.shift();
+    updateHist();
+  }
+  countDb++;
+}
+
+btn.addEventListener('click', async () => {
+  if (running) {
+    running = false;
+    cancelAnimationFrame(rafId);
+    if (source) source.disconnect();
+    if (audioCtx) audioCtx.close();
+    btn.textContent = 'Activer le microphone';
+    btn.classList.remove('active');
+    dbDisplay.innerHTML = '– <span>dB</span>';
+    dbDisplay.style.color = '#5DCAA5';
+    badge.textContent = 'En attente';
+    badge.style.background = '#1e293b';
+    badge.style.color = '#64748b';
+    bar.style.width = '0%';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    resizeCanvas();
+    history = []; countDb = 0;
+    buildHist();
+    running = true;
+    btn.textContent = 'Arrêter';
+    btn.classList.add('active');
+    errorMsg.style.display = 'none';
+    loop();
+  } catch(e) {
+    errorMsg.style.display = 'block';
+    errorMsg.textContent = 'Accès au microphone refusé. Autorisez le microphone dans Réglages Safari.';
+  }
+});
+
+window.addEventListener('resize', () => { if (running) resizeCanvas(); });
+buildHist();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
