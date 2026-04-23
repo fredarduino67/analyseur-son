@@ -4,254 +4,225 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Son Visuel">
-  <meta name="theme-color" content="#0f172a">
-  <link rel="apple-touch-icon" href="icon.png">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Rando">
   <link rel="manifest" href="manifest.json">
-  <title>Analyseur de Son</title>
+  <title>Rando France</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; background: #0f172a; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; overflow: hidden; }
-    #app { display: flex; flex-direction: column; height: 100%; padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 16px); gap: 14px; }
-    #header { text-align: center; padding-top: 8px; }
-    #header h1 { font-size: 17px; font-weight: 600; color: #94a3b8; letter-spacing: 0.05em; text-transform: uppercase; }
-
-    /* Grand affichage dB */
-    #db-section { text-align: center; }
-    #db-display { font-size: 80px; font-weight: 700; line-height: 1; transition: color 0.15s; color: #5DCAA5; }
-    #db-display span { font-size: 28px; font-weight: 400; color: #64748b; margin-left: 4px; }
-    #status-badge {
-      display: inline-block; margin-top: 8px;
-      font-size: 15px; font-weight: 600; padding: 5px 20px;
-      border-radius: 99px; transition: background 0.2s, color 0.2s;
-      background: #1e293b; color: #64748b;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; width: 100%; overflow: hidden; font-family: -apple-system, sans-serif; }
+    body.dark  { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --text2: #94a3b8; --border: #334155; }
+    body.light { --bg: #f0f4f8; --card: #ffffff;  --text: #0f172a; --text2: #64748b; --border: #e2e8f0; }
+    #app { display: flex; flex-direction: column; height: 100%; background: var(--bg); }
+    #topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top));
+      background: var(--card); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; z-index: 9999;
     }
-
-    /* Barre de niveau */
-    #bar-wrap { flex-shrink: 0; }
-    #bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: #475569; margin-bottom: 5px; }
-    #bar-track { width: 100%; height: 28px; background: #1e293b; border-radius: 14px; overflow: hidden; }
-    #bar { height: 100%; width: 0%; border-radius: 14px; transition: width 0.08s, background 0.2s; }
-
-    /* Légende */
-    #legend { display: flex; justify-content: space-around; flex-shrink: 0; }
-    .leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #64748b; }
-    .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-
-    /* Forme d'onde */
-    #wave-wrap { flex: 1; min-height: 0; }
-    #wave-canvas { display: block; width: 100%; height: 100%; border-radius: 16px; background: #1e293b; }
-
-    /* Historique */
-    #hist-wrap { flex-shrink: 0; }
-    #hist-row { display: flex; gap: 4px; align-items: flex-end; height: 44px; }
-    .hbar { flex: 1; border-radius: 3px 3px 0 0; transition: height 0.15s; background: #1e293b; min-width: 0; }
-    #hist-label { font-size: 10px; color: #334155; text-align: center; margin-top: 3px; }
-
-    /* Bouton */
-    #btn-wrap { flex-shrink: 0; }
-    #start-btn {
-      display: block; width: 100%; padding: 16px;
-      background: #1d4ed8; color: #fff;
-      border: none; border-radius: 16px;
-      font-size: 17px; font-weight: 600; cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+    #topbar h1 { font-size: 17px; font-weight: 700; color: var(--text); }
+    .tbtn {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: var(--bg); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 18px;
     }
-    #start-btn:active { transform: scale(0.97); background: #1e40af; }
-    #start-btn.active { background: #7f1d1d; }
-    #start-btn.active:active { background: #991b1b; }
-
-    #error-msg {
-      display: none; background: #7f1d1d; color: #fca5a5;
-      border-radius: 12px; padding: 12px; font-size: 14px; text-align: center;
+    #map-container { flex: 1; position: relative; min-height: 0; }
+    #map { width: 100%; height: 100%; }
+    #fab-center {
+      position: absolute; right: 14px; bottom: 14px; z-index: 9000;
+      width: 42px; height: 42px; border-radius: 12px;
+      background: var(--card); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-
-    /* Instruction installation */
-    #install-hint {
-      text-align: center; font-size: 12px; color: #334155;
-      padding: 4px 0;
+    #fab-type {
+      position: absolute; right: 14px; bottom: 66px; z-index: 9000;
+      border-radius: 12px; padding: 8px 12px;
+      background: var(--card); border: 1px solid var(--border);
+      font-size: 13px; font-weight: 600; color: var(--text);
+      cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
+    #statsbar {
+      display: flex; align-items: center; justify-content: space-around;
+      background: var(--card); border-top: 1px solid var(--border);
+      padding: 10px 8px; padding-bottom: max(10px, env(safe-area-inset-bottom));
+      flex-shrink: 0;
+    }
+    .stat { text-align: center; flex: 1; }
+    .sval { font-size: 20px; font-weight: 700; color: var(--text); }
+    .slbl { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+    #recbtn {
+      width: 50px; height: 50px; border-radius: 50%; border: none;
+      background: #2563eb; cursor: pointer; font-size: 20px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    #recbtn.on { background: #dc2626; }
+    #toast {
+      position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.8); color: #fff;
+      padding: 8px 18px; border-radius: 99px; font-size: 13px;
+      z-index: 99999; opacity: 0; transition: opacity 0.3s;
+      pointer-events: none; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+    .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
   </style>
 </head>
-<body>
+<body class="dark">
 <div id="app">
-  <div id="header"><h1>Analyseur de Son</h1></div>
-
-  <div id="db-section">
-    <div id="db-display">– <span>dB</span></div>
-    <div id="status-badge">En attente</div>
+  <div id="topbar">
+    <div class="tbtn" id="theme-btn">☀️</div>
+    <h1>Rando France</h1>
+    <div class="tbtn" id="clear-btn">🗑️</div>
   </div>
-
-  <div id="bar-wrap">
-    <div id="bar-labels">
-      <span>Silence</span><span>Faible</span><span>Normal</span><span>Fort</span><span>Très fort</span>
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="fab-type">🥾 Pied</div>
+    <div id="fab-center">📍</div>
+    <div id="toast"></div>
+  </div>
+  <div id="statsbar">
+    <div class="stat"><div class="sval" id="sdist">0.0</div><div class="slbl">km</div></div>
+    <div class="stat"><div class="sval" id="salt">–</div><div class="slbl">alt. m</div></div>
+    <div class="stat">
+      <button id="recbtn">⏺️</button>
     </div>
-    <div id="bar-track"><div id="bar"></div></div>
+    <div class="stat"><div class="sval" id="sdur">00:00</div><div class="slbl">durée</div></div>
+    <div class="stat"><div class="sval" id="sspeed">0.0</div><div class="slbl">km/h</div></div>
   </div>
-
-  <div id="legend">
-    <div class="leg"><div class="leg-dot" style="background:#5DCAA5"></div>Silence</div>
-    <div class="leg"><div class="leg-dot" style="background:#378ADD"></div>Faible</div>
-    <div class="leg"><div class="leg-dot" style="background:#EF9F27"></div>Normal</div>
-    <div class="leg"><div class="leg-dot" style="background:#E24B4A"></div>Fort</div>
-  </div>
-
-  <div id="wave-wrap"><canvas id="wave-canvas"></canvas></div>
-
-  <div id="hist-wrap">
-    <div id="hist-row"></div>
-    <div id="hist-label">Historique 20 secondes</div>
-  </div>
-
-  <div id="error-msg"></div>
-  <div id="btn-wrap"><button id="start-btn">Activer le microphone</button></div>
-  <div id="install-hint">Pour installer : Safari → Partager → Sur l'écran d'accueil</div>
 </div>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 <script>
-const btn = document.getElementById('start-btn');
-const dbDisplay = document.getElementById('db-display');
-const bar = document.getElementById('bar');
-const badge = document.getElementById('status-badge');
-const canvas = document.getElementById('wave-canvas');
-const ctx = canvas.getContext('2d');
-const histRow = document.getElementById('hist-row');
-const errorMsg = document.getElementById('error-msg');
+var dark = true, randoType = 'pied', recording = false;
+var track = [], trackLine = null, startTime = null;
+var timer = null, watchId = null, userMarker = null, userPos = null;
+var map;
 
-let audioCtx, analyser, source, rafId, running = false;
-let history = [], countDb = 0, currentDb = 0;
-
-function getColor(db) {
-  if (db < 30) return '#5DCAA5';
-  if (db < 55) return '#378ADD';
-  if (db < 70) return '#EF9F27';
-  return '#E24B4A';
-}
-function getLabel(db) {
-  if (db < 30) return { text: 'Silence', bg: '#052e16', color: '#86efac' };
-  if (db < 40) return { text: 'Très faible', bg: '#0c1a3a', color: '#93c5fd' };
-  if (db < 55) return { text: 'Faible', bg: '#0c1a3a', color: '#93c5fd' };
-  if (db < 65) return { text: 'Normal', bg: '#2d1a00', color: '#fcd34d' };
-  if (db < 75) return { text: 'Fort', bg: '#3b0000', color: '#fca5a5' };
-  return { text: 'Très fort', bg: '#3b0000', color: '#f87171' };
+function init() {
+  map = L.map('map', { zoomControl: false, attributionControl: false });
+  map.setView([46.5, 2.5], 6);
+  L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17, subdomains: 'abc'
+  }).addTo(map);
+  setTimeout(function(){ map.invalidateSize(); }, 300);
 }
 
-function buildHist() {
-  histRow.innerHTML = '';
-  for (let i = 0; i < 20; i++) {
-    const d = document.createElement('div');
-    d.className = 'hbar';
-    histRow.appendChild(d);
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+function fmt(ms) {
+  var s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60);
+  if (h > 0) return h+':'+pad(m%60)+':'+pad(s%60);
+  return pad(m)+':'+pad(s%60);
+}
+function pad(n){ return n < 10 ? '0'+n : ''+n; }
+
+function dist(pts) {
+  var d = 0;
+  for (var i = 1; i < pts.length; i++)
+    d += map.distance([pts[i-1].lat, pts[i-1].lng],[pts[i].lat, pts[i].lng]);
+  return d;
+}
+
+function addPt(lat, lng, alt) {
+  track.push({lat:lat, lng:lng});
+  if (track.length > 1) {
+    var ll = track.map(function(p){ return [p.lat, p.lng]; });
+    if (trackLine) map.removeLayer(trackLine);
+    trackLine = L.polyline(ll, { color: randoType==='velo' ? '#f59e0b' : '#3b82f6', weight: 5 }).addTo(map);
   }
+  document.getElementById('sdist').textContent = (dist(track)/1000).toFixed(2);
+  if (alt && alt > 0) document.getElementById('salt').textContent = Math.round(alt);
 }
-function updateHist() {
-  const bars = histRow.querySelectorAll('.hbar');
-  const slice = history.slice(-20);
-  bars.forEach((b, i) => {
-    const v = slice[i];
-    if (v == null) { b.style.height = '2px'; b.style.background = '#1e293b'; return; }
-    b.style.height = Math.min(100, Math.max(2, v)) + '%';
-    b.style.background = getColor(v);
+
+function dotIcon() {
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 3px rgba(59,130,246,0.35)"></div>',
+    iconSize: [16,16], iconAnchor: [8,8]
   });
 }
 
-function resizeCanvas() {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * window.devicePixelRatio;
-  canvas.height = rect.height * window.devicePixelRatio;
+function setPos(lat, lng, alt, speed) {
+  userPos = [lat, lng];
+  if (!userMarker) userMarker = L.marker([lat,lng],{icon:dotIcon()}).addTo(map);
+  else userMarker.setLatLng([lat,lng]);
+  if (alt != null && alt > 0) document.getElementById('salt').textContent = Math.round(alt);
+  if (speed != null) document.getElementById('sspeed').textContent = (speed*3.6).toFixed(1);
+  if (recording) addPt(lat, lng, alt);
 }
 
-function drawWave(data) {
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
-  ctx.beginPath();
-  ctx.strokeStyle = getColor(currentDb);
-  ctx.lineWidth = 2.5 * window.devicePixelRatio;
-  const step = Math.ceil(data.length / (W / window.devicePixelRatio));
-  let x = 0;
-  for (let i = 0; i < data.length; i += step) {
-    const v = (data[i] / 128) - 1;
-    const y = H / 2 + v * (H / 2 - 8);
-    i === 0 ? ctx.moveTo(x * window.devicePixelRatio, y) : ctx.lineTo(x * window.devicePixelRatio, y);
-    x++;
-  }
-  ctx.stroke();
-}
-
-function loop() {
-  if (!running) return;
-  rafId = requestAnimationFrame(loop);
-  const len = analyser.frequencyBinCount;
-  const data = new Uint8Array(len);
-  analyser.getByteTimeDomainData(data);
-  let rms = 0;
-  for (let i = 0; i < len; i++) { const s = (data[i] / 128) - 1; rms += s * s; }
-  rms = Math.sqrt(rms / len);
-  const db = rms > 0 ? Math.round(20 * Math.log10(rms) + 90) : 0;
-  currentDb = Math.max(0, Math.min(100, db));
-  const color = getColor(currentDb);
-  const label = getLabel(currentDb);
-  dbDisplay.innerHTML = currentDb + ' <span>dB</span>';
-  dbDisplay.style.color = color;
-  bar.style.width = currentDb + '%';
-  bar.style.background = color;
-  badge.textContent = label.text;
-  badge.style.background = label.bg;
-  badge.style.color = label.color;
-  drawWave(data);
-  if (countDb % 10 === 0) {
-    history.push(currentDb);
-    if (history.length > 20) history.shift();
-    updateHist();
-  }
-  countDb++;
-}
-
-btn.addEventListener('click', async () => {
-  if (running) {
-    running = false;
-    cancelAnimationFrame(rafId);
-    if (source) source.disconnect();
-    if (audioCtx) audioCtx.close();
-    btn.textContent = 'Activer le microphone';
-    btn.classList.remove('active');
-    dbDisplay.innerHTML = '– <span>dB</span>';
-    dbDisplay.style.color = '#5DCAA5';
-    badge.textContent = 'En attente';
-    badge.style.background = '#1e293b';
-    badge.style.color = '#64748b';
-    bar.style.width = '0%';
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    return;
-  }
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    source = audioCtx.createMediaStreamSource(stream);
-    source.connect(analyser);
-    resizeCanvas();
-    history = []; countDb = 0;
-    buildHist();
-    running = true;
-    btn.textContent = 'Arrêter';
-    btn.classList.add('active');
-    errorMsg.style.display = 'none';
-    loop();
-  } catch(e) {
-    errorMsg.style.display = 'block';
-    errorMsg.textContent = 'Accès au microphone refusé. Autorisez le microphone dans Réglages Safari.';
+document.getElementById('recbtn').addEventListener('click', function() {
+  if (!recording) {
+    recording = true; track = []; startTime = Date.now();
+    this.classList.add('on'); this.textContent = '⏹️';
+    document.getElementById('sdist').textContent = '0.0';
+    document.getElementById('sdur').textContent = '00:00';
+    timer = setInterval(function(){
+      document.getElementById('sdur').textContent = fmt(Date.now()-startTime);
+    }, 1000);
+    watchId = navigator.geolocation.watchPosition(function(p){
+      setPos(p.coords.latitude, p.coords.longitude, p.coords.altitude, p.coords.speed);
+    }, function(){ toast('GPS non disponible'); }, { enableHighAccuracy:true, maximumAge:2000 });
+    toast('Enregistrement démarré');
+  } else {
+    recording = false;
+    this.classList.remove('on'); this.textContent = '⏺️';
+    clearInterval(timer);
+    if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    toast('Arrêté — ' + document.getElementById('sdist').textContent + ' km');
   }
 });
 
-window.addEventListener('resize', () => { if (running) resizeCanvas(); });
-buildHist();
+document.getElementById('fab-center').addEventListener('click', function() {
+  if (userPos) { map.setView(userPos, 15); return; }
+  navigator.geolocation.getCurrentPosition(function(p){
+    userPos = [p.coords.latitude, p.coords.longitude];
+    map.setView(userPos, 15);
+    setPos(p.coords.latitude, p.coords.longitude, p.coords.altitude, null);
+  }, function(){ toast('Activez le GPS'); });
+});
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
+document.getElementById('fab-type').addEventListener('click', function() {
+  randoType = randoType==='pied' ? 'velo' : 'pied';
+  this.textContent = randoType==='pied' ? '🥾 Pied' : '🚴 Vélo';
+  if (trackLine) trackLine.setStyle({ color: randoType==='velo' ? '#f59e0b' : '#3b82f6' });
+});
+
+document.getElementById('theme-btn').addEventListener('click', function() {
+  dark = !dark;
+  document.body.className = dark ? 'dark' : 'light';
+  this.textContent = dark ? '☀️' : '🌙';
+});
+
+document.getElementById('clear-btn').addEventListener('click', function() {
+  if (recording) { toast('Arrêtez d\'abord'); return; }
+  if (trackLine) { map.removeLayer(trackLine); trackLine = null; }
+  track = [];
+  document.getElementById('sdist').textContent = '0.0';
+  document.getElementById('salt').textContent = '–';
+  document.getElementById('sdur').textContent = '00:00';
+  document.getElementById('sspeed').textContent = '0.0';
+  toast('Tracé effacé');
+});
+
+window.addEventListener('load', function() {
+  init();
+  navigator.geolocation.getCurrentPosition(function(p){
+    userPos = [p.coords.latitude, p.coords.longitude];
+    map.setView(userPos, 14);
+    setPos(p.coords.latitude, p.coords.longitude, p.coords.altitude, null);
+  }, function(){});
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
 </script>
 </body>
 </html>
